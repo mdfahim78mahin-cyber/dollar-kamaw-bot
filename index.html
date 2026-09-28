@@ -270,7 +270,7 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 <div class="side-menu-divider"></div>
 <button class="side-menu-item danger" onclick="menuLogout()"><div class="menu-icon"><i data-lucide="log-out"></i></div><span class="menu-label">লগআউট</span></button>
 </div>
-<div class="side-menu-footer"><p>ডলার কামাও • ভার্সন 6.0.0</p></div>
+<div class="side-menu-footer"><p>ডলার কামাও • ভার্সন 6.1.0</p></div>
 </div>
 
 <!-- AUTH -->
@@ -990,6 +990,31 @@ window.usdToBdt=usdToBdt;
 window.bdtToUsd=bdtToUsd;
 window.fmtUsd=fmtUsd;
 
+// ✅ Cycle Config Helper — অ্যাডমিন থেকে যেকোনো cycle এর তথ্য আনবে
+function getCycleConfig(cycleNumber){
+if(!appConfig)return{requiredReferrals:20,requireVerification:true,requireQuiz:true,requireSocialTask:true};
+const cycles=appConfig.withdrawCycles||[];
+const cycle=cycles.find(c=>c.cycleNumber===cycleNumber);
+if(cycle){
+return{
+requiredReferrals:cycle.requiredReferrals!==undefined?parseInt(cycle.requiredReferrals):0,
+requiredVerifiedReferrals:cycle.requiredVerifiedReferrals!==undefined?parseInt(cycle.requiredVerifiedReferrals):0,
+requireVerification:cycle.requireVerification!==false,
+requireQuiz:cycle.requireQuiz!==false,
+requireSocialTask:cycle.requireSocialTask!==false
+};
+}
+const dflt=appConfig.defaultCycle||{};
+return{
+requiredReferrals:dflt.requiredReferrals!==undefined?parseInt(dflt.requiredReferrals):2,
+requiredVerifiedReferrals:dflt.requiredVerifiedReferrals!==undefined?parseInt(dflt.requiredVerifiedReferrals):0,
+requireVerification:dflt.requireVerification!==false,
+requireQuiz:dflt.requireQuiz!==false,
+requireSocialTask:dflt.requireSocialTask!==false
+};
+}
+window.getCycleConfig=getCycleConfig;
+
 function syncAllRewardDisplays(){
 const rad=document.getElementById('refer-amount-display');if(rad)rad.textContent=fmtUsd(REWARD_REFERRAL);
 const rbd=document.getElementById('refer-bonus-display');if(rbd)rbd.textContent=fmtUsd(REWARD_REFERRAL);
@@ -1379,7 +1404,7 @@ window.closeSideMenu=function(){document.getElementById('side-menu').classList.r
 window.menuNavigate=function(p){closeSideMenu();setTimeout(()=>navigateTo(p),250);};
 window.menuLogout=function(){closeSideMenu();setTimeout(()=>{if(confirm('লগআউট?'))handleLogout();},250);};
 window.menuTelegramChannel=function(){closeSideMenu();setTimeout(()=>window.open(TELEGRAM_CHANNEL_URL,'_blank'),250);};
-window.showAboutApp=function(){closeSideMenu();setTimeout(()=>showAlert(`ℹ️ ডলার কামাও\n📱 ভার্সন: 6.0.0 (USD)\n🤖 বট: @Dollarkamaw10k_bot\n💱 1$ = ৳${USD_TO_BDT_RATE}`),250);};
+window.showAboutApp=function(){closeSideMenu();setTimeout(()=>showAlert(`ℹ️ ডলার কামাও\n📱 ভার্সন: 6.1.0 (USD)\n🤖 বট: @Dollarkamaw10k_bot\n💱 1$ = ৳${USD_TO_BDT_RATE}`),250);};
 window.showContactInfo=function(){closeSideMenu();setTimeout(()=>showAlert(`📞 যোগাযোগ\n📢 t.me/Dollarkamaw10k_bot`),250);};
 
 function updateSideMenuUserInfo(){
@@ -1548,6 +1573,7 @@ if(unsubscribeConfigListener)unsubscribeConfigListener();
 unsubscribeConfigListener=onSnapshot(doc(db,"config","main"),(snap)=>{
 if(snap.exists()){
 const d=snap.data();
+appConfig=d;
 verificationEnabled=d.verificationEnabled!==false;
 boostEnabled=d.boostEnabled!==false;
 referralEnabled=d.referralEnabled!==false;
@@ -1580,7 +1606,6 @@ if(typeof updateTelegramBonusUI==='function')updateTelegramBonusUI();
 });
 }
 
-// ✅ কনফিগ অনুযায়ী UI দেখানো/লুকানো
 function applyConfigVisibility(){
 const dailyWrap=document.getElementById('daily-bonus-card-wrap');
 if(dailyWrap){dailyWrap.style.display=dailyBonusEnabled?'block':'none';}
@@ -1962,6 +1987,7 @@ verificationStatus='pending';updateUI();showAlert("✅ জমা!");closeVerific
 loader.style.display='none';
 };
 
+// ✅✅✅ FIXED: handleWithdrawal — এখন অ্যাডমিন থেকে Cycle পড়বে
 async function handleWithdrawal(){
 const usdAmount=parseFloat(document.getElementById('withdraw-amount-usd').value);
 const bdtAmount=parseInt(document.getElementById('withdraw-amount').value);
@@ -1972,10 +1998,29 @@ const iv=userData.isVerified||false;
 const quizPlayed=(userData.quizTotalPlayed||0)>=1;
 const socialTaskDone=(userData.completedSocialTasks||[]).length>=1;
 if(wc===0){
+// ✅ অ্যাডমিন থেকে Cycle 1 এর কনফিগ আনবে
+const cycleCfg=getCycleConfig(1);
+const requiredRefs=cycleCfg.requiredReferrals;
+const requireVerify=cycleCfg.requireVerification;
+const requireQuiz=cycleCfg.requireQuiz;
+const requireSocial=cycleCfg.requireSocialTask;
 const vo=verificationEnabled?iv:true;
-const ro=tr>=20;
-if(!vo||!ro||!quizPlayed||!socialTaskDone){
-showWithdrawPopup(`<div style="text-align:center"><div style="font-size:70px;margin-bottom:16px">🔒</div><h3 style="background:linear-gradient(135deg,#10b981,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:24px;font-weight:900;margin-bottom:6px">১ম পেমেন্টের শর্ত</h3><p style="color:#9ca3af;font-size:12px;margin-bottom:18px">সব শর্ত পূরণ করুন</p><div style="text-align:left;margin-bottom:20px">${verificationEnabled?`<div class="popup-requirement ${vo?'success':'fail'}"><span class="popup-requirement-icon">${vo?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${vo?'success':'fail'}">ভেরিফাইড</p><p class="popup-requirement-desc">${vo?'✓':'ভেরিফাই (৳৫০)'}</p></div></div>`:''}<div class="popup-requirement ${ro?'success':'fail'}"><span class="popup-requirement-icon">${ro?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${ro?'success':'fail'}">রেফার: ${tr}/২০</p><p class="popup-requirement-desc">${ro?'✓':`আরও ${20-tr} জন`}</p><div class="popup-progress-track"><div class="popup-progress-fill" style="width:${Math.min((tr/20)*100,100)}%"></div></div></div></div><div class="popup-requirement ${quizPlayed?'success':'fail'}"><span class="popup-requirement-icon">${quizPlayed?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${quizPlayed?'success':'fail'}">কুইজ</p><p class="popup-requirement-desc">${quizPlayed?'✓':'অন্তত ১ বার'}</p></div></div><div class="popup-requirement ${socialTaskDone?'success':'fail'}"><span class="popup-requirement-icon">${socialTaskDone?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${socialTaskDone?'success':'fail'}">সোশ্যাল টাস্ক</p><p class="popup-requirement-desc">${socialTaskDone?'✓':'অন্তত ১টি'}</p></div></div></div><button onclick="closeWithdrawPopup()" class="popup-btn-v2" style="background:linear-gradient(135deg,#10b981,#fbbf24)">✓ বুঝেছি</button></div>`);
+const ro=tr>=requiredRefs;
+const allDone=(!requireVerify||vo)&&(!requireQuiz||quizPlayed)&&(!requireSocial||socialTaskDone)&&ro;
+if(!allDone){
+showWithdrawPopup(`<div style="text-align:center">
+<div style="font-size:70px;margin-bottom:16px">🔒</div>
+<h3 style="background:linear-gradient(135deg,#10b981,#fbbf24);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:24px;font-weight:900;margin-bottom:6px">১ম পেমেন্টের শর্ত</h3>
+<p style="color:#9ca3af;font-size:12px;margin-bottom:18px">সব শর্ত পূরণ করুন</p>
+<div style="text-align:left;margin-bottom:20px">
+${requireVerify&&verificationEnabled?`<div class="popup-requirement ${vo?'success':'fail'}"><span class="popup-requirement-icon">${vo?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${vo?'success':'fail'}">ভেরিফাইড অ্যাকাউন্ট</p><p class="popup-requirement-desc">${vo?'✓ সম্পন্ন':'ভেরিফাই করুন (৳৫০)'}</p></div></div>`:''}
+<div class="popup-requirement ${ro?'success':'fail'}"><span class="popup-requirement-icon">${ro?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${ro?'success':'fail'}">মোট রেফার: ${tr}/${requiredRefs}</p><p class="popup-requirement-desc">${ro?'✓ সম্পন্ন':`আরও ${requiredRefs-tr} জন লাগবে`}</p><div class="popup-progress-track"><div class="popup-progress-fill" style="width:${requiredRefs>0?Math.min((tr/requiredRefs)*100,100):100}%"></div></div></div></div>
+${requireQuiz?`<div class="popup-requirement ${quizPlayed?'success':'fail'}"><span class="popup-requirement-icon">${quizPlayed?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${quizPlayed?'success':'fail'}">কুইজ খেলেছেন</p><p class="popup-requirement-desc">${quizPlayed?'✓ সম্পন্ন':'অন্তত ১ বার কুইজ খেলুন'}</p></div></div>`:''}
+${requireSocial?`<div class="popup-requirement ${socialTaskDone?'success':'fail'}"><span class="popup-requirement-icon">${socialTaskDone?'✅':'❌'}</span><div class="popup-requirement-info"><p class="popup-requirement-title ${socialTaskDone?'success':'fail'}">সোশ্যাল টাস্ক</p><p class="popup-requirement-desc">${socialTaskDone?'✓ সম্পন্ন':'অন্তত ১টি টাস্ক করুন'}</p></div></div>`:''}
+</div>
+<div style="padding:12px;background:rgba(16,185,129,.1);border-radius:12px;margin-bottom:16px"><p style="font-size:11px;color:#34d399;font-weight:700">✅ ১ম পেমেন্টের পর আর কোনো শর্ত থাকবে না!</p></div>
+<button onclick="closeWithdrawPopup()" class="popup-btn-v2" style="background:linear-gradient(135deg,#10b981,#fbbf24)">✓ বুঝেছি</button>
+</div>`);
 return;
 }
 }
@@ -2429,7 +2474,7 @@ showMainPage('auth-section');
 }
 }
 
-console.log("✅ Dollar Panel v6.0 Loaded — Bot: @Dollarkamaw10k_bot | 1$ = " + USD_TO_BDT_RATE + "৳");
+console.log("✅ Dollar Panel v6.1 Loaded — Bot: @Dollarkamaw10k_bot | Cycle Config From Admin!");
 </script>
 </body>
 </html>
